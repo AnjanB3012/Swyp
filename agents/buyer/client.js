@@ -2,19 +2,26 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hashPayload, signPayload, generateNonce } from "../../shared/crypto.js";
+import { decideNegotiation } from "../../shared/llmClient.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SELLER_URL = "http://localhost:4001/negotiate";
+const SELLER_ANS_NAME = "ans://seller-local.test";
+const ITEM = "concert-ticket";
+
+// Hardcoded buyer preferences for now — a config step later can make these adjustable.
+const BUYER_TARGET_PRICE = 40;
+const BUYER_CEILING_PRICE = 55;
 
 const identity = JSON.parse(fs.readFileSync(path.join(__dirname, "identity.json"), "utf8"));
 
-function buildOfferMessage() {
-  const payload = { item: "concert-ticket", price: 45 };
+function buildMessage(type, price) {
+  const payload = { item: ITEM, price };
   return {
-    type: "offer",
+    type,
     from_ans_name: identity.ansName,
-    to_ans_name: "ans://seller-local.test",
+    to_ans_name: SELLER_ANS_NAME,
     nonce: generateNonce(),
     timestamp: new Date().toISOString(),
     payload,
@@ -34,14 +41,55 @@ async function postNegotiate(message) {
 }
 
 async function main() {
-  const offerMessage = buildOfferMessage();
+  console.log("[BUYER] Deciding opening offer...");
+  const openingDecision = await decideNegotiation({
+    role: "buyer",
+    item: ITEM,
+    incomingOffer: null,
+    targetPrice: BUYER_TARGET_PRICE,
+    floorOrCeiling: BUYER_CEILING_PRICE,
+  });
+  console.log(`[BUYER] LLM reasoning: ${openingDecision.reasoning}`);
 
-  console.log("[BUYER] Sending offer...");
+  const offerMessage = buildMessage("offer", openingDecision.price);
+
+  console.log(`[BUYER] Sending offer @ ${openingDecision.price}...`);
   const offerResult = await postNegotiate(offerMessage);
   console.log(`[BUYER] Offer response (HTTP ${offerResult.status}):`, JSON.stringify(offerResult.body));
 
-  // Attack demo: replay the exact same message (same nonce) a second time.
-  console.log("[BUYER] Replaying the same offer (attack demo)...");
+  const sellerResponse = offerResult.body.ok ? offerResult.body.response : null;
+
+  // One follow-up round: only if the seller countered, not on accept/reject.
+  if (sellerResponse && sellerResponse.type === "counter") {
+    const sellerCounterPrice = sellerResponse.payload.price;
+    console.log(`[BUYER] Seller countered @ ${sellerCounterPrice}. Deciding follow-up...`);
+
+    const followUpDecision = await decideNegotiation({
+      role: "buyer",
+      item: ITEM,
+      incomingOffer: sellerCounterPrice,
+      targetPrice: BUYER_TARGET_PRICE,
+      floorOrCeiling: BUYER_CEILING_PRICE,
+    });
+    console.log(`[BUYER] LLM reasoning: ${followUpDecision.reasoning}`);
+
+    const followUpPrice =
+      followUpDecision.action === "counter"
+        ? followUpDecision.price
+        : followUpDecision.action === "accept"
+          ? sellerCounterPrice
+          : null;
+    const followUpMessage = buildMessage(followUpDecision.action, followUpPrice);
+
+    console.log(
+      `[BUYER] Sending ${followUpDecision.action}${followUpPrice != null ? " @ " + followUpPrice : ""}...`
+    );
+    const followUpResult = await postNegotiate(followUpMessage);
+    console.log(`[BUYER] Follow-up response (HTTP ${followUpResult.status}):`, JSON.stringify(followUpResult.body));
+  }
+
+  // Attack demo: replay the original signed offer message (same nonce) a second time.
+  console.log("[BUYER] Replaying the original offer (attack demo)...");
   const replayResult = await postNegotiate(offerMessage);
   console.log(`[BUYER] Replay response (HTTP ${replayResult.status}):`, JSON.stringify(replayResult.body));
 }

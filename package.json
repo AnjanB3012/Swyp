@@ -9,5 +9,8 @@
     "seller": "node agents/seller/server.js",
     "buyer": "node agents/buyer/client.js"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "openai": "^7.20.0"
+  }
 }
