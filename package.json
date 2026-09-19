@@ -1,0 +1,13 @@
+{
+  "name": "warden-mesh",
+  "version": "0.1.0",
+  "description": "Buyer/Seller negotiation agents that discover each other via ANS, verify identity, and negotiate deals under a supervisor/worker trust boundary.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"dev script placeholder - no logic yet\"",
+    "seller": "node agents/seller/server.js",
+    "buyer": "node agents/buyer/client.js"
+  },
+  "license": "UNLICENSED"
+}
