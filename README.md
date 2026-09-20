@@ -8,4 +8,3 @@ A native Android wallet that compares card rewards with forecast spending, reads
 
 **Start with [SETUP.md](SETUP.md)** for keys, Firebase configuration, device setup, exact commands, and the walkthrough. [ARCHITECTURE.md](ARCHITECTURE.md) explains the data model, transaction boundary, forecast, and limitations.
 
-This is a functional hackathon implementation with simulated cards and purchases. It does not issue real credit cards, obtain real credit scores, or pay at retail terminals. A bank token alone cannot replace the demo protocol: retail payments require an issuer/network-supported wallet and payment processing integration.
