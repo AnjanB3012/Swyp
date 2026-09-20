@@ -2,8 +2,8 @@
     <style name="Theme.Swyp" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#101C19</item>
-        <item name="android:navigationBarColor">#101C19</item>
+        <item name="android:statusBarColor">#0F172A</item>
+        <item name="android:navigationBarColor">#0F172A</item>
     </style>
     <style name="Theme.Swyp.Capture" parent="android:style/Theme.Translucent.NoTitleBar">
         <item name="android:windowIsTranslucent">true</item>
