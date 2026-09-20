@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -74,6 +75,7 @@ class MainActivity : ComponentActivity() {
                         !s.profileLoaded -> LoadingAccountScreen()
                         s.fullName.isBlank() || s.age == 0 || s.phone.isBlank() || s.homeZip.isBlank() ->
                             ProfileSetupScreen(s, vm)
+                        s.armed -> TapToPayScreen(s, vm)
                         else -> Scaffold(
                             containerColor = Color.Transparent,
                             bottomBar = {
@@ -394,20 +396,64 @@ class MainActivity : ComponentActivity() {
     val selected = s.cards.find { it.id == s.selected }
     val selectedRank = s.ranks.find { it.card.id == s.selected }
     val eligible = selected != null && (selectedRank?.eligible ?: (selected.limitCents > 0 && selected.balanceCents.toDouble() / selected.limitCents <= s.ceiling))
-    PrimaryButton(if (s.armed) "Ready to tap" else "Pay with ${selected?.name ?: "selected card"}", vm::arm, enabled = !s.busy && !s.armed && s.status == "ready" && eligible)
-    if (s.armed) {
-        Row(
-            Modifier.fillMaxWidth().background(Palette.Success, RoundedCornerShape(20.dp)).padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
+    PrimaryButton("Pay with ${selected?.name ?: "selected card"}", vm::arm, enabled = !s.busy && !s.armed && s.status == "ready" && eligible)
+}
+
+/** Full-screen contactless moment shown while a card is armed for tap-to-pay. */
+@Composable private fun TapToPayScreen(s: UiState, vm: SwypViewModel) {
+    val selected = s.cards.find { it.id == s.selected }
+    val transition = rememberInfiniteTransition(label = "tap")
+    val pulse by transition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing)), label = "pulse",
+    )
+    Box(Modifier.fillMaxSize().background(Palette.HeroBrush)) {
+        FlowLines(Modifier.matchParentSize())
+        Column(
+            Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterVertically),
         ) {
-            Icon(Icons.Pay, null, tint = Color.White, modifier = Modifier.size(32.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Ready to tap", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                Text("${selected?.name} •••• ${selected?.last4}", color = Color.White.copy(alpha = .9f), style = MaterialTheme.typography.bodyMedium)
-                Text("Hold near the iPhone reader within 2 minutes", color = Color.White.copy(alpha = .85f), style = MaterialTheme.typography.bodySmall)
+            if (s.checkout.amountCents > 0) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(money(s.checkout.amountCents), color = Color.White, style = MaterialTheme.typography.displaySmall)
+                    if (s.checkout.merchant.isNotBlank())
+                        Text(s.checkout.merchant, color = Color.White.copy(alpha = .85f), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            Box(Modifier.size(220.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.matchParentSize()) {
+                    val maxR = size.minDimension / 2f
+                    repeat(3) { i ->
+                        val t = (pulse + i / 3f) % 1f
+                        drawCircle(
+                            Color.White.copy(alpha = (1f - t) * 0.45f),
+                            radius = maxR * (0.42f + 0.58f * t),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx()),
+                        )
+                    }
+                }
+                Box(Modifier.size(104.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Pay, null, tint = Palette.Primary, modifier = Modifier.size(52.dp))
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Ready to tap", color = Color.White, style = MaterialTheme.typography.displaySmall)
+                Text(
+                    "${selected?.name ?: "Selected card"} •••• ${selected?.last4 ?: "••••"}",
+                    color = Color.White.copy(alpha = .92f), style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    "Hold your phone near the iPhone reader within 2 minutes",
+                    color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { TextButton(onClick = vm::cancelTap) { Text("Cancel", color = Palette.TextMuted) } }
+        TextButton(
+            onClick = vm::cancelTap,
+            modifier = Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(bottom = 16.dp),
+        ) { Text("Cancel", color = Color.White, style = MaterialTheme.typography.labelLarge) }
     }
 }
 
