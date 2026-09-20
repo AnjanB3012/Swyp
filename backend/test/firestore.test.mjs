@@ -1,0 +1,14 @@
+import {readFile} from 'node:fs/promises';
+import {test, before, after, beforeEach} from 'node:test';
+import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
+import {doc,setDoc,getDoc,updateDoc} from 'firebase/firestore';
+let env;
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-swyp',firestore:{rules:await readFile('firestore.rules','utf8')}})});
+after(async()=>{await env.cleanup()});
+beforeEach(async()=>{await env.clearFirestore()});
+const proof=()=>({credentialId:'card-1',amountCents:2599,currency:'USD',terminalId:'demo-terminal-01',nonce:'abcdefghijklmnopqrstuv',timestamp:Math.floor(Date.now()/1000),signature:'demo-test-proof',status:'pending'});
+test('clients cannot create or alter payment receipts',async()=>{const db=env.authenticatedContext('alice').firestore();const ref=doc(db,'users/alice/paymentRequests/abcdefghijklmnopqrstuv');await assertFails(setDoc(ref,proof()));await assertFails(updateDoc(ref,{status:'posted'}));});
+test('other users cannot read or write another wallet',async()=>{const db=env.authenticatedContext('bob').firestore();await assertFails(getDoc(doc(db,'users/alice')));await assertFails(setDoc(doc(db,'users/alice/paymentRequests/abcdefghijklmnopqrstuv'),proof()));});
+test('clients cannot change balances or generation flags',async()=>{const db=env.authenticatedContext('alice').firestore();await assertFails(setDoc(doc(db,'users/alice/cards/card-1'),{balanceCents:0}));await assertFails(setDoc(doc(db,'config/app'),{'auto-generate-transactions':true}));});
+test('rejects expired, negative, extra-field and forged receipts',async()=>{const db=env.authenticatedContext('alice').firestore();const ref=doc(db,'users/alice/paymentRequests/abcdefghijklmnopqrstuv');for(const patch of [{timestamp:1},{amountCents:-1},{currency:'EUR'},{status:'posted'},{unexpected:true},{nonce:'anothernonce'},{terminalId:'bad\nterminal'}])await assertFails(setDoc(ref,{...proof(),...patch}));});
+test('anonymous requests cannot read data or queue purchases',async()=>{const db=env.unauthenticatedContext().firestore();await assertFails(getDoc(doc(db,'deals/offer')));await assertFails(setDoc(doc(db,'users/alice/paymentRequests/abcdefghijklmnopqrstuv'),proof()));});

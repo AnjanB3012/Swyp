@@ -1,0 +1,11 @@
+.DS_Store
+.gradle/
+**/build/
+**/.idea/
+**/*.iml
+**/DerivedData/
+**/.swiftpm/
+backend/node_modules/
+backend/dist/
+backend/.env
+

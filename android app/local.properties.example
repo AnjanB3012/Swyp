@@ -1,0 +1,5 @@
+sdk.dir=/absolute/path/to/Android/sdk
+SWYP_BACKEND_URL=http://10.0.2.2:8080
+FIREBASE_API_KEY=from-google-services-json-current-key
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_APP_ID=from-google-services-json-mobilesdk-app-id
