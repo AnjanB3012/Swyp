@@ -3,3 +3,4 @@ logs/
 .env
 certs/
 agents/**/identity.json
+.DS_Store
