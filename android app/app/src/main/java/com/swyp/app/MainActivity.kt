@@ -19,12 +19,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -34,11 +34,6 @@ import java.time.LocalDate
 import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
 
-private val Navy = Color(0xFF0F172A)
-private val Teal = Color(0xFF4F46E5)
-private val Mist = Color(0xFFEEF2FF)
-private val Paper = Color(0xFFF8FAFC)
-private val Orange = Color(0xFFF59E0B)
 
 class MainActivity : ComponentActivity() {
     private val vm: SwypViewModel by viewModels()
@@ -70,15 +65,9 @@ class MainActivity : ComponentActivity() {
         receive(intent)
         if (android.os.Build.VERSION.SDK_INT >= 33) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {
-            MaterialTheme(
-                colorScheme = lightColorScheme(primary = Teal, secondary = Navy, background = Paper, surface = Color.White),
-                typography = androidx.compose.material3.Typography(
-                    bodyLarge = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
-                    labelMedium = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp),
-                ),
-            ) {
+            SwypTheme {
                 val s by vm.state.collectAsState()
-                Surface(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFF8FAFF), Color(0xFFEEF2FF)))), color = Color.Transparent) {
+                Surface(Modifier.fillMaxSize().background(Palette.CanvasBrush), color = Color.Transparent) {
                     when {
                         !s.configured -> SetupScreen()
                         !s.signedIn -> LoginScreen(s, vm)
@@ -88,16 +77,24 @@ class MainActivity : ComponentActivity() {
                         else -> Scaffold(
                             containerColor = Color.Transparent,
                             bottomBar = {
-                                NavigationBar(containerColor = Color.White) {
-                                    listOf("Home" to "⌂", "Cards" to "▭", "Pay" to "◖)))", "Scan" to "⌗", "Nearby" to "⌖")
-                                        .forEach { (name, icon) ->
-                                            NavigationBarItem(
-                                                selected = currentTab == name,
-                                                onClick = { currentTab = name; selectedCardDetail = null },
-                                                icon = { Text(icon, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) },
-                                                label = { Text(name) },
-                                            )
-                                        }
+                                Column {
+                                    HorizontalDivider(color = Palette.Border)
+                                    NavigationBar(containerColor = Palette.Surface, tonalElevation = 0.dp) {
+                                        listOf("Home" to Icons.Home, "Cards" to Icons.Cards, "Pay" to Icons.Pay, "Scan" to Icons.Scan, "Nearby" to Icons.Nearby)
+                                            .forEach { (name, icon) ->
+                                                NavigationBarItem(
+                                                    selected = currentTab == name,
+                                                    onClick = { currentTab = name; selectedCardDetail = null },
+                                                    icon = { Icon(icon, name, Modifier.size(24.dp)) },
+                                                    label = { Text(name, style = MaterialTheme.typography.labelSmall) },
+                                                    colors = NavigationBarItemDefaults.colors(
+                                                        selectedIconColor = Palette.Primary, selectedTextColor = Palette.Primary,
+                                                        unselectedIconColor = Palette.TextMuted, unselectedTextColor = Palette.TextMuted,
+                                                        indicatorColor = Palette.Tint,
+                                                    ),
+                                                )
+                                            }
+                                    }
                                 }
                             },
                         ) { insets ->
@@ -105,9 +102,9 @@ class MainActivity : ComponentActivity() {
                                 Modifier.padding(insets).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp),
                             ) {
-                                Spacer(Modifier.height(5.dp))
+                                Spacer(Modifier.height(4.dp))
                                 AppHeader { vm.signOut(); pendingImage = null }
-                                if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Teal)
+                                if (s.busy) UtilBar(0.0, color = Palette.Primary)
                                 if (s.message.isNotBlank()) InfoCard(s.message)
                                 val detail = selectedCardDetail?.let { id -> s.cards.find { it.id == id } }
                                 when {
@@ -131,7 +128,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                     currentTab == "Insights" -> Insights(s, vm) { currentTab = "Home" }
                                 }
-                                Spacer(Modifier.height(16.dp))
+                                Spacer(Modifier.height(24.dp))
                             }
                         }
                     }
@@ -177,9 +174,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable private fun LoadingAccountScreen() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            CircularProgressIndicator(color = Teal)
-            Text("Loading your Swyp account…", color = Navy)
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LogoMark(56.dp)
+            CircularProgressIndicator(color = Palette.Primary, strokeWidth = 3.dp)
+            Muted("Loading your Swyp account…", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -189,40 +187,40 @@ class MainActivity : ComponentActivity() {
     var age by remember(s.age) { mutableStateOf(if (s.age > 0) s.age.toString() else "") }
     var phone by remember(s.phone) { mutableStateOf(s.phone) }
     var zip by remember(s.homeZip) { mutableStateOf(s.homeZip) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Spacer(Modifier.height(24.dp))
-        Text("Swyp", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Navy)
-        Text("Finish your profile", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-        Text("This information stays connected to your account and is required before using your wallet.", color = Color.Gray)
-        OutlinedTextField(name, { name = it }, label = { Text("Full name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(age, { age = it.filter(Char::isDigit).take(3) }, label = { Text("Age") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(phone, { phone = it.take(20) }, label = { Text("Phone number") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(zip, { zip = it.filter { c -> c.isDigit() || c == '-' }.take(10) }, label = { Text("Home ZIP code") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { vm.saveProfile(name, age, phone, zip) }, enabled = !s.busy, modifier = Modifier.fillMaxWidth().height(54.dp)) { Text("Save and continue") }
-        if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (s.message.isNotBlank()) Text(s.message, color = MaterialTheme.colorScheme.error)
-        TextButton(onClick = vm::signOut) { Text("Sign out") }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Spacer(Modifier.height(16.dp))
+        LogoMark(52.dp)
+        ScreenTitle("Finish your profile", "A few details to set up your wallet. You only need to do this once.")
+        Spacer(Modifier.height(4.dp))
+        SwypField(name, { name = it }, "Full name")
+        SwypField(age, { age = it.filter(Char::isDigit).take(3) }, "Age", keyboard = KeyboardType.Number)
+        SwypField(phone, { phone = it.take(20) }, "Phone number", keyboard = KeyboardType.Phone)
+        SwypField(zip, { zip = it.filter { c -> c.isDigit() || c == '-' }.take(10) }, "Home ZIP code", keyboard = KeyboardType.Number)
+        if (s.busy) UtilBar(0.0, color = Palette.Primary)
+        if (s.message.isNotBlank()) Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        PrimaryButton("Save and continue", { vm.saveProfile(name, age, phone, zip) }, enabled = !s.busy)
+        TextButton(onClick = vm::signOut, Modifier.align(Alignment.CenterHorizontally)) { Text("Sign out", color = Palette.TextMuted) }
     }
 }
 
 @Composable private fun AppHeader(signOut: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(42.dp).background(Teal, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                Text("S", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-            Text("Swyp", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Navy)
+            LogoMark(40.dp)
+            Text("Swyp", style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold))
         }
-        TextButton(onClick = signOut) { Text("Sign out") }
+        TextButton(onClick = signOut) { Text("Sign out", style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp), color = Palette.TextMuted) }
     }
 }
 
 @Composable private fun SetupScreen() {
-    Column(Modifier.fillMaxSize().padding(30.dp), verticalArrangement = Arrangement.Center) {
-        Text("Swyp", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Navy)
-        Text("One purchase. A smarter choice.", fontSize = 20.sp)
+    Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.Center) {
+        LogoMark(56.dp)
         Spacer(Modifier.height(24.dp))
-        Text("Connect Firebase in android app/local.properties, then rebuild. See SETUP.md.")
+        Text("Swyp", style = MaterialTheme.typography.displaySmall)
+        Muted("One purchase. A smarter choice.", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(24.dp))
+        InfoCard("Connect Firebase in android app/local.properties, then rebuild. See SETUP.md.")
     }
 }
 
@@ -230,20 +228,28 @@ class MainActivity : ComponentActivity() {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var signup by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Spacer(Modifier.height(50.dp))
-        Text("Swyp", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Navy)
-        Text("Make every\npurchase count.", fontSize = 28.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-        Text("Your cards. Their rewards. One thoughtful choice.", color = Color.Gray)
-        OutlinedTextField(email, { email = it }, label = { Text("Email address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(password, { password = it }, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { if (signup) vm.signUp(email, password) else vm.signIn(email, password) }, enabled = !s.busy, modifier = Modifier.fillMaxWidth().height(54.dp)) {
-            Text(if (signup) "Create account" else "Sign in")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)).background(Palette.HeroBrush)) {
+            FlowLines(Modifier.matchParentSize())
+            Column(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 28.dp, end = 28.dp, top = 28.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LogoMark(52.dp, onDark = true)
+                Spacer(Modifier.height(12.dp))
+                Text("Make every purchase count.", style = MaterialTheme.typography.displaySmall, color = Color.White)
+                Text("Your cards. Their rewards. One thoughtful choice.", style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = .85f))
+            }
         }
-        TextButton(onClick = { signup = !signup }) { Text(if (signup) "Already have an account? Sign in" else "New here? Create an account") }
-        TextButton(onClick = { vm.reset(email) }) { Text("Forgot password?") }
-        if (s.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (s.message.isNotBlank()) Text(s.message, color = MaterialTheme.colorScheme.error)
+        Column(Modifier.padding(horizontal = 24.dp, vertical = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(if (signup) "Create your account" else "Welcome back", style = MaterialTheme.typography.headlineSmall)
+            SwypField(email, { email = it }, "Email address", keyboard = KeyboardType.Email)
+            SwypField(password, { password = it }, "Password", password = true)
+            if (s.busy) UtilBar(0.0, color = Palette.Primary)
+            if (s.message.isNotBlank()) Text(s.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            PrimaryButton(if (signup) "Create account" else "Sign in", { if (signup) vm.signUp(email, password) else vm.signIn(email, password) }, enabled = !s.busy)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { signup = !signup }) { Text(if (signup) "I have an account" else "Create an account", color = Palette.Primary) }
+                TextButton(onClick = { vm.reset(email) }) { Text("Forgot password?", color = Palette.TextMuted) }
+            }
+        }
     }
 }
 
@@ -258,233 +264,271 @@ class MainActivity : ComponentActivity() {
         val card = s.cards.find { it.id == row.cardId }
         if (card == null) 0L else (row.amountCents * Recommender.rate(card, Checkout(row.merchant, row.amountCents, row.category))).roundToLong()
     }
-    Text("Your money, in view", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    Card(colors = CardDefaults.cardColors(containerColor = Navy), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("This month", color = Color.White, fontSize = 15.sp)
-            Text(money(spent), color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.SemiBold)
-            Text("Across ${s.cards.size} cards", color = Mist)
-        }
+    HeroPanel {
+        Text("Spent this month", color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodyMedium)
+        Text(money(spent), color = Color.White, style = MaterialTheme.typography.displaySmall.copy(fontSize = 38.sp, lineHeight = 44.sp))
+        Spacer(Modifier.height(6.dp))
+        Text("Across ${s.cards.size} ${if (s.cards.size == 1) "card" else "cards"}", color = Color.White, style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.background(Color.White.copy(alpha = .18f), CircleShape).padding(horizontal = 12.dp, vertical = 5.dp))
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        MetricCard("Rewards earned", money(rewards), Modifier.weight(1f))
-        MetricCard("Credit used", "${(util * 100).toInt()}%", Modifier.weight(1f))
+        MetricCard("Rewards earned", money(rewards), Palette.Success, Modifier.weight(1f))
+        MetricCard("Credit used", "${(util * 100).toInt()}%", utilColor(util), Modifier.weight(1f))
     }
-    Text("Best card for your next shop", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
+    SectionHeader("Best card for your next shop")
     val best = s.ranks.firstOrNull { it.eligible }?.card ?: s.cards.minByOrNull { if (it.limitCents > 0) it.balanceCents.toDouble() / it.limitCents else 1.0 }
     if (best != null) {
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(best.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-                Text("•••• ${best.last4} · ${rewardLabel(best.product)}")
-                Button(onClick = onPay, modifier = Modifier.fillMaxWidth()) { Text("Choose a card →") }
+        SurfaceCard(padding = 18.dp, gap = 16.dp) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                MiniCard(s.cards.indexOfFirst { it.id == best.id }.coerceAtLeast(0))
+                Column(Modifier.weight(1f)) {
+                    Text(best.name, style = MaterialTheme.typography.titleMedium)
+                    Muted("•••• ${best.last4} · ${rewardLabel(best.product)}")
+                }
             }
+            PrimaryButton("Choose a card", onPay)
         }
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("Recent activity", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-        TextButton(onClick = onInsights) { Text("View insights ›") }
-    }
+    } else SurfaceCard { Muted("Add a card to see your best pick.", style = MaterialTheme.typography.bodyMedium) }
+    SectionHeader("Recent activity", "View insights", onInsights)
     ActivityList(s.history.take(5))
 }
 
-@Composable private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(Modifier.padding(16.dp)) { Text(label, color = Color.DarkGray); Text(value, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Navy) }
+@Composable private fun MetricCard(label: String, value: String, accent: Color, modifier: Modifier = Modifier) {
+    SurfaceCard(modifier, padding = 16.dp, gap = 6.dp) {
+        Muted(label, style = MaterialTheme.typography.bodySmall)
+        Text(value, style = MaterialTheme.typography.headlineSmall, color = accent)
     }
 }
 
 @Composable private fun Cards(s: UiState, vm: SwypViewModel, open: (String) -> Unit) {
-    Text("Your cards", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    Text("A clear view of your credit.", fontSize = 15.sp, color = Color.Gray)
+    ScreenTitle("Your cards", "A clear view of your credit.")
     val limit = s.cards.sumOf { it.limitCents }
     val balance = s.cards.sumOf { it.balanceCents }
     val util = if (limit > 0) balance.toDouble() / limit else 0.0
-    Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Total credit used")
-            Text("${(util * 100).toInt()}%", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-            Text("${money(balance)} of ${money(limit)}")
-            LinearProgressIndicator({ util.toFloat().coerceIn(0f, 1f) }, Modifier.fillMaxWidth(), color = Teal, trackColor = Mist)
+    SurfaceCard(padding = 20.dp, gap = 10.dp) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            Column {
+                Muted("Total credit used", style = MaterialTheme.typography.bodyMedium)
+                Text("${(util * 100).toInt()}%", style = MaterialTheme.typography.displaySmall, color = utilColor(util))
+            }
+            Pill(if (util <= .3) "Healthy" else if (util <= .6) "Watch it" else "High", utilTint(util), utilColor(util))
         }
+        UtilBar(util)
+        Muted("${money(balance)} of ${money(limit)}")
     }
     if (s.cards.isEmpty()) {
-        Text(if (s.status == "generating") "Creating your Nessie wallet and transaction history…" else "Your wallet is empty.")
-        if (s.status == "ready") Button(onClick = vm::createCards, enabled = !s.busy) { Text("Add cards") }
+        SurfaceCard {
+            Text(if (s.status == "generating") "Creating your Nessie wallet and transaction history…" else "Your wallet is empty.", style = MaterialTheme.typography.bodyMedium)
+            if (s.status == "ready") PrimaryButton("Add cards", vm::createCards, enabled = !s.busy)
+        }
     }
-    s.cards.forEachIndexed { index, card -> CardRow(card, index, { open(card.id) }) }
+    s.cards.forEachIndexed { index, card -> CardRow(card, index) { open(card.id) } }
 }
 
 @Composable private fun CardRow(card: SwypCard, index: Int, open: () -> Unit) {
     val util = if (card.limitCents > 0) card.balanceCents.toDouble() / card.limitCents else 0.0
-    Card(Modifier.fillMaxWidth().clickable(onClick = open), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(72.dp, 48.dp).background(cardGradient(index), RoundedCornerShape(10.dp)))
-                    Column { Text(card.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Navy); Text("•••• ${card.last4}"); Text(rewardLabel(card.product), fontSize = 12.sp) }
-                }
-                Text("${(util * 100).toInt()}% used", color = if (util > .3) Orange else Teal, fontWeight = FontWeight.SemiBold)
+    SurfaceCard(onClick = open, padding = 16.dp, gap = 14.dp) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            MiniCard(index)
+            Column(Modifier.weight(1f)) {
+                Text(card.name, style = MaterialTheme.typography.titleMedium)
+                Muted("•••• ${card.last4} · ${rewardLabel(card.product)}")
             }
-            LinearProgressIndicator({ util.toFloat().coerceIn(0f, 1f) }, Modifier.fillMaxWidth(), color = if (util > .3) Orange else Teal, trackColor = Mist)
-            Text("${money(card.balanceCents)} / ${money(card.limitCents)}", fontSize = 12.sp)
+            Pill("${(util * 100).toInt()}%", utilTint(util), utilColor(util))
         }
+        UtilBar(util)
+        Muted("${money(card.balanceCents)} of ${money(card.limitCents)} used")
     }
 }
 
 @Composable private fun CardDetail(card: SwypCard, rows: List<Purchase>, back: () -> Unit) {
-    TextButton(onClick = back) { Text("← All cards") }
-    Text(card.name, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    Card(colors = CardDefaults.cardColors(containerColor = Navy), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("•••• ${card.last4}", color = Color.White, fontSize = 17.sp)
-            Text(rewardLabel(card.product), color = Mist)
-            Text("${money(card.balanceCents)} of ${money(card.limitCents)} used", color = Color.White)
+    val util = if (card.limitCents > 0) card.balanceCents.toDouble() / card.limitCents else 0.0
+    TextButton(onClick = back, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("‹  All cards", color = Palette.Primary, style = MaterialTheme.typography.labelLarge) }
+    Box(Modifier.fillMaxWidth().aspectRatio(1.586f).clip(RoundedCornerShape(24.dp)).background(Palette.HeroBrush)) {
+        FlowLines(Modifier.matchParentSize())
+        Column(Modifier.fillMaxSize().padding(22.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(card.name, color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text("SWYP", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.labelMedium)
+            }
+            Text("••••  ••••  ••••  ${card.last4}", color = Color.White, style = MaterialTheme.typography.headlineSmall.copy(letterSpacing = 1.sp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(rewardLabel(card.product), color = Color.White.copy(alpha = .85f), style = MaterialTheme.typography.bodyMedium)
+                UtilBar(util, color = Color.White, track = Color.White.copy(alpha = .28f))
+                Text("${money(card.balanceCents)} of ${money(card.limitCents)} used", color = Color.White, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
-    Text("Transactions", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    if (rows.isEmpty()) Text("No transactions on this card yet.", color = Color.Gray) else ActivityList(rows)
+    SectionHeader("Transactions")
+    if (rows.isEmpty()) SurfaceCard { Muted("No transactions on this card yet.", style = MaterialTheme.typography.bodyMedium) } else ActivityList(rows)
 }
 
 @Composable private fun Pay(s: UiState, vm: SwypViewModel) {
-    Text("Choose & pay", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    Text("Select the card you want to present to the Swyp reader.", fontSize = 15.sp, color = Color.Gray)
+    ScreenTitle("Choose & pay", "Select the card you want to present to the Swyp reader.")
     if (s.checkout.amountCents > 0) {
         InfoCard("${s.checkout.merchant} · ${money(s.checkout.amountCents)}${if (s.checkout.items.isNotEmpty()) " · ${s.checkout.items.size} items" else ""}")
     }
     val ordered = if (s.ranks.isEmpty()) s.cards else s.ranks.map { it.card }
-    ordered.forEach { card ->
+    ordered.forEachIndexed { index, card ->
         val rank = s.ranks.find { it.card.id == card.id }
         val currentUtil = if (card.limitCents > 0) card.balanceCents.toDouble() / card.limitCents else 1.0
         val eligible = rank?.eligible ?: (currentUtil <= s.ceiling)
-        Card(
-            Modifier.fillMaxWidth().clickable(enabled = eligible) { vm.select(card.id) },
-            colors = CardDefaults.cardColors(containerColor = if (s.selected == card.id) Mist else Color.White),
+        val chosen = s.selected == card.id
+        SurfaceCard(
+            onClick = { vm.select(card.id) }, enabled = eligible,
+            container = if (chosen) Palette.Tint else Palette.Surface,
+            border = if (chosen) Palette.Primary else Palette.Border, borderWidth = if (chosen) 2.dp else 1.dp,
+            padding = 16.dp,
         ) {
-            Row(Modifier.padding(18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column { Text(card.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Navy); Text("•••• ${card.last4} · ${rewardLabel(card.product)}", fontSize = 12.sp); if (rank != null) Text("${money(rank.rewardCents)} estimated rewards", color = Teal) }
-                Text(if (eligible) if (s.selected == card.id) "✓" else "○" else "Over target", color = if (eligible) Teal else Orange)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                MiniCard(index)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(card.name, style = MaterialTheme.typography.titleMedium, color = if (eligible) Palette.Ink else Palette.TextMuted)
+                    Muted("•••• ${card.last4} · ${rewardLabel(card.product)}")
+                    if (rank != null) Text("${money(rank.rewardCents)} est. rewards", color = Palette.Success, style = MaterialTheme.typography.labelMedium)
+                }
+                if (eligible) RadioDot(chosen) else Pill("Over target", Palette.WarningTint, Palette.Warning)
             }
         }
     }
     val selected = s.cards.find { it.id == s.selected }
     val selectedRank = s.ranks.find { it.card.id == s.selected }
     val eligible = selected != null && (selectedRank?.eligible ?: (selected.limitCents > 0 && selected.balanceCents.toDouble() / selected.limitCents <= s.ceiling))
-    Button(onClick = vm::arm, enabled = !s.busy && !s.armed && s.status == "ready" && eligible, modifier = Modifier.fillMaxWidth().height(58.dp)) {
-        Text(if (s.armed) "Ready to tap" else "Ready to pay with ${selected?.name ?: "selected card"}")
-    }
+    PrimaryButton(if (s.armed) "Ready to tap" else "Pay with ${selected?.name ?: "selected card"}", vm::arm, enabled = !s.busy && !s.armed && s.status == "ready" && eligible)
     if (s.armed) {
-        Card(colors = CardDefaults.cardColors(containerColor = Teal), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(20.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("◖)))", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-                Column {
-                    Text("Ready to tap", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${selected?.name} •••• ${selected?.last4}", color = Mist)
-                    Text("Hold near the iPhone reader within 2 minutes", color = Color.White, fontSize = 12.sp)
-                }
+        Row(
+            Modifier.fillMaxWidth().background(Palette.Success, RoundedCornerShape(20.dp)).padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(Icons.Pay, null, tint = Color.White, modifier = Modifier.size(32.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Ready to tap", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text("${selected?.name} •••• ${selected?.last4}", color = Color.White.copy(alpha = .9f), style = MaterialTheme.typography.bodyMedium)
+                Text("Hold near the iPhone reader within 2 minutes", color = Color.White.copy(alpha = .85f), style = MaterialTheme.typography.bodySmall)
             }
         }
-        TextButton(onClick = vm::cancelTap) { Text("Cancel") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { TextButton(onClick = vm::cancelTap) { Text("Cancel", color = Palette.TextMuted) } }
     }
 }
 
 @Composable private fun Scan(s: UiState, vm: SwypViewModel, image: Bitmap?, clear: () -> Unit, camera: () -> Unit, pick: () -> Unit, capture: () -> Unit, pay: () -> Unit) {
-    Text("Scan & save", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    Text("We read every visible bill item and check for matching offers.", fontSize = 15.sp, color = Color.Gray)
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = camera) { Text("Camera") }; OutlinedButton(onClick = pick) { Text("Photo") }; OutlinedButton(onClick = capture) { Text("Screenshot") }
+    ScreenTitle("Scan & save", "We read every visible bill item and check for matching offers.")
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        SecondaryButton("Camera", camera, Modifier.weight(1f)); SecondaryButton("Photo", pick, Modifier.weight(1f)); SecondaryButton("Screenshot", capture, Modifier.weight(1.3f))
     }
-    Text("Add “Scan with Swyp” in Quick Settings, or share a screenshot to Swyp.", fontSize = 12.sp, color = Color.Gray)
+    Muted("Tip: add “Scan with Swyp” to Quick Settings, or share a screenshot to Swyp.")
     if (image != null) {
-        Image(image.asImageBitmap(), "Bill preview", Modifier.fillMaxWidth().height(210.dp))
-        Row { Button(onClick = { vm.scan(image); clear() }, enabled = !s.busy) { Text("Analyze all items") }; TextButton(onClick = clear) { Text("Discard") } }
+        SurfaceCard(padding = 12.dp, gap = 12.dp) {
+            Image(image.asImageBitmap(), "Bill preview", Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(12.dp)))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                PrimaryButton("Analyze all items", { vm.scan(image); clear() }, Modifier.weight(1f), enabled = !s.busy)
+                TextButton(onClick = clear) { Text("Discard", color = Palette.TextMuted) }
+            }
+        }
     }
     var merchant by remember(s.checkout.merchant) { mutableStateOf(s.checkout.merchant) }
     var amount by remember(s.checkout.amountCents) { mutableStateOf(if (s.checkout.amountCents > 0) BigDecimal(s.checkout.amountCents).movePointLeft(2).toPlainString() else "") }
     var category by remember(s.checkout.category) { mutableStateOf(s.checkout.category) }
-    OutlinedTextField(merchant, { merchant = it; vm.cancelTap() }, label = { Text("Merchant") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    OutlinedTextField(amount, { amount = it; vm.cancelTap() }, label = { Text("Total in USD") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    SectionHeader("Purchase details")
+    SwypField(merchant, { merchant = it; vm.cancelTap() }, "Merchant")
+    SwypField(amount, { amount = it; vm.cancelTap() }, "Total in USD", keyboard = KeyboardType.Decimal)
+    Muted("Category")
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf("grocery", "dining", "entertainment", "streaming", "travel", "gas", "other").forEach {
-            FilterChip(selected = category == it, onClick = { category = it; vm.cancelTap() }, label = { Text(it) })
+            CategoryChip(it.replaceFirstChar(Char::uppercase), category == it) { category = it; vm.cancelTap() }
         }
     }
-    Button(onClick = {
+    PrimaryButton("Compare my cards", {
         val cents = runCatching { BigDecimal(amount).movePointRight(2).longValueExact() }.getOrNull()
         if (cents == null || cents !in 1..100000000 || merchant.isBlank()) vm.message("Enter a merchant and valid USD amount")
         else vm.checkout(Checkout(merchant.trim(), cents, category, "USD", s.checkout.items))
-    }, modifier = Modifier.fillMaxWidth()) { Text("Compare my cards") }
+    })
     if (s.checkout.items.isNotEmpty()) {
-        Text("Items found (${s.checkout.items.size})", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                s.checkout.items.forEachIndexed { index, item ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${item.quantity.toCleanQuantity()} × ${item.name}", Modifier.weight(1f)); Text(money(item.totalPriceCents))
-                    }
-                    if (index < s.checkout.items.lastIndex) HorizontalDivider()
+        SectionHeader("Items found (${s.checkout.items.size})")
+        SurfaceCard(padding = 16.dp, gap = 0.dp) {
+            s.checkout.items.forEachIndexed { index, item ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("${item.quantity.toCleanQuantity()} × ${item.name}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text(money(item.totalPriceCents), style = MaterialTheme.typography.titleMedium)
                 }
+                if (index < s.checkout.items.lastIndex) HorizontalDivider(color = Palette.Border)
             }
         }
         val matches = s.checkout.matches(s.offers)
-        Text("Deals for this bill", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-        if (matches.isEmpty()) Text("No verified item offers match this bill right now.", color = Color.Gray)
+        SectionHeader("Deals for this bill")
+        if (matches.isEmpty()) SurfaceCard { Muted("No verified item offers match this bill right now.", style = MaterialTheme.typography.bodyMedium) }
         matches.forEach { match -> DealCard(match.offer, match.itemName, s, vm) }
     }
     if (s.ranks.isNotEmpty()) {
-        Text("Recommended card", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-        s.ranks.take(3).forEach { rank ->
-            Card(Modifier.fillMaxWidth().clickable(enabled = rank.eligible) { vm.select(rank.card.id) }, colors = CardDefaults.cardColors(containerColor = if (s.selected == rank.card.id) Mist else Color.White)) {
-                Column(Modifier.padding(16.dp)) { Text(rank.card.name, fontWeight = FontWeight.SemiBold, color = Navy); Text("${money(rank.rewardCents)} reward value · ${(rank.projectedUtilization * 100).toInt()}% projected use"); Text(rank.reason, fontSize = 12.sp) }
+        SectionHeader("Recommended card")
+        s.ranks.take(3).forEachIndexed { i, rank ->
+            val chosen = s.selected == rank.card.id
+            SurfaceCard(
+                onClick = { vm.select(rank.card.id) }, enabled = rank.eligible,
+                container = if (chosen) Palette.Tint else Palette.Surface,
+                border = if (chosen) Palette.Primary else Palette.Border, borderWidth = if (chosen) 2.dp else 1.dp, gap = 4.dp,
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(rank.card.name, style = MaterialTheme.typography.titleMedium)
+                    if (i == 0) Pill("Best match", Palette.SuccessTint, Palette.Success)
+                }
+                Text("${money(rank.rewardCents)} reward value · ${(rank.projectedUtilization * 100).toInt()}% projected use", style = MaterialTheme.typography.bodyMedium)
+                Muted(rank.reason)
             }
         }
-        Button(onClick = pay, modifier = Modifier.fillMaxWidth()) { Text("Continue to Tap to Pay") }
+        PrimaryButton("Continue to Tap to Pay", pay)
     }
 }
 
 @Composable private fun DealCard(offer: Offer, itemName: String?, s: UiState, vm: SwypViewModel) {
-    Card(colors = CardDefaults.cardColors(containerColor = Mist), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(offer.title, fontWeight = FontWeight.SemiBold, color = Navy)
-            if (itemName != null) Text("Matches $itemName", color = Teal)
-            Text("${offer.merchant} · through ${offer.expiresOn}", fontSize = 12.sp)
-            if (offer.requiresActivation) OutlinedButton(onClick = { vm.activate(offer.id) }) { Text(if (offer.id in s.activated) "Activated" else "Activate offer") }
+    SurfaceCard(container = Palette.Tint, border = Palette.Tint, gap = 6.dp) {
+        Text(offer.title, style = MaterialTheme.typography.titleMedium)
+        if (itemName != null) Text("Matches $itemName", color = Palette.Primary, style = MaterialTheme.typography.labelMedium)
+        Muted("${offer.merchant} · through ${offer.expiresOn}")
+        if (offer.requiresActivation) {
+            val on = offer.id in s.activated
+            if (on) Pill("Activated ✓", Palette.SuccessTint, Palette.Success)
+            else SecondaryButton("Activate offer", { vm.activate(offer.id) })
         }
     }
 }
 
 @Composable private fun Nearby(s: UiState, vm: SwypViewModel, locationGranted: Boolean, enable: () -> Unit, disable: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    Text("Nearby deals", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = Navy)
+    ScreenTitle("Nearby deals", "Offers from stores around you.")
     if (!locationGranted) {
-        Card(colors = CardDefaults.cardColors(containerColor = Mist)) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("See offers after you stay at a participating store for two minutes.")
-                OutlinedButton(onClick = enable) { Text("Allow location") }
-            }
+        SurfaceCard(container = Palette.Tint, border = Palette.Tint, padding = 18.dp, gap = 12.dp) {
+            Text("See offers after you stay at a participating store for two minutes.", style = MaterialTheme.typography.bodyMedium)
+            SecondaryButton("Allow location", enable)
         }
-    } else TextButton(onClick = disable) { Text("Turn off nearby alerts") }
+    } else TextButton(onClick = disable, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Turn off nearby alerts", color = Palette.TextMuted) }
     if (s.stores.isNotEmpty()) {
         NearbyMap(s.stores)
-        Text("Participating stores", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
+        SectionHeader("Participating stores")
         s.stores.forEach { store ->
-            Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(store.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-                    Text(store.address, color = Color.Gray)
+            SurfaceCard(gap = 2.dp) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Avatar(store.name)
+                    Column { Text(store.name, style = MaterialTheme.typography.titleMedium); Muted(store.address) }
                 }
             }
         }
     }
+    SectionHeader("Offers")
     if (s.offers.isEmpty()) InfoCard("No verified offers are available right now.")
     s.offers.forEach { offer ->
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(offer.merchant, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-                Text(offer.title, fontSize = 15.sp, color = Teal)
-                Text("Use ${offer.product} · through ${offer.expiresOn}", fontSize = 12.sp)
-                TextButton(onClick = { if (offer.sourceUrl.startsWith("https://")) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(offer.sourceUrl))) }) { Text("View eligibility ›") }
-                if (offer.requiresActivation) OutlinedButton(onClick = { vm.activate(offer.id) }) { Text(if (offer.id in s.activated) "Activated" else "Activate offer") }
+        SurfaceCard(padding = 18.dp, gap = 6.dp) {
+            Text(offer.merchant, style = MaterialTheme.typography.titleMedium)
+            Text(offer.title, style = MaterialTheme.typography.bodyLarge, color = Palette.Primary, fontWeight = FontWeight.Medium)
+            Muted("Use ${offer.product} · through ${offer.expiresOn}")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (offer.requiresActivation) {
+                    if (offer.id in s.activated) Pill("Activated ✓", Palette.SuccessTint, Palette.Success)
+                    else SecondaryButton("Activate", { vm.activate(offer.id) })
+                }
+                TextButton(onClick = { if (offer.sourceUrl.startsWith("https://")) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(offer.sourceUrl))) }) {
+                    Text("View eligibility ›", color = Palette.TextMuted, style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp))
+                }
             }
         }
     }
@@ -518,41 +562,48 @@ class MainActivity : ComponentActivity() {
             }
         },
         update = { view -> if (view.tag != html) { view.tag = html; view.loadDataWithBaseURL("https://www.openstreetmap.org/", html, "text/html", "UTF-8", null) } },
-        modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(20.dp)),
+        modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(24.dp)),
     )
 }
 
 @Composable private fun Insights(s: UiState, vm: SwypViewModel, back: () -> Unit) {
-    TextButton(onClick = back) { Text("← Home") }
-    Text("Spending insights", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    Text("Utilization target: ${(s.ceiling * 100).toInt()}%", fontWeight = FontWeight.SemiBold)
-    Slider(s.ceiling.toFloat(), { vm.ceiling(it.toDouble()) }, valueRange = .05f..0.80f)
+    TextButton(onClick = back, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("‹  Home", color = Palette.Primary, style = MaterialTheme.typography.labelLarge) }
+    ScreenTitle("Spending insights", "See what's coming and tune your comfort zone.")
+    SurfaceCard(padding = 20.dp, gap = 4.dp) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Utilization target", style = MaterialTheme.typography.titleMedium)
+            Pill("${(s.ceiling * 100).toInt()}%", Palette.Tint, Palette.Primary)
+        }
+        Muted("Swyp avoids cards that would push you past this.")
+        Slider(
+            s.ceiling.toFloat(), { vm.ceiling(it.toDouble()) }, valueRange = .05f..0.80f,
+            colors = SliderDefaults.colors(thumbColor = Palette.Primary, activeTrackColor = Palette.Primary, inactiveTrackColor = Palette.Tint),
+        )
+    }
     val forecast = Recommender.forecast(s.history)
-    Text("Expected before month-end", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
-    if (forecast.isEmpty()) Text("We need at least three regular charges to learn a pattern.", color = Color.Gray)
+    SectionHeader("Expected before month-end")
+    if (forecast.isEmpty()) SurfaceCard { Muted("We need at least three regular charges to learn a pattern.", style = MaterialTheme.typography.bodyMedium) }
     forecast.forEach { f -> InfoCard("${f.merchant} · ${f.due} · ${money(f.cents)} · ${(f.confidence * 100).toInt()}% regularity") }
-    Text("Recent activity", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Navy)
+    SectionHeader("Recent activity")
     ActivityList(s.history.take(30))
 }
 
 @Composable private fun ActivityList(rows: List<Purchase>) {
-    Card(colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            rows.forEachIndexed { index, row ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column { Text(row.merchant, fontWeight = FontWeight.SemiBold, color = Navy); Text("${row.category} · ${row.date}", fontSize = 12.sp, color = Color.Gray) }
-                    Text(money(row.amountCents), fontWeight = FontWeight.SemiBold)
+    if (rows.isEmpty()) { SurfaceCard { Muted("No activity yet.", style = MaterialTheme.typography.bodyMedium) }; return }
+    SurfaceCard(padding = 4.dp, gap = 0.dp) {
+        rows.forEachIndexed { index, row ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Avatar(row.merchant)
+                Column(Modifier.weight(1f)) {
+                    Text(row.merchant, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    Muted("${row.category.replaceFirstChar(Char::uppercase)} · ${row.date}")
                 }
-                if (index < rows.lastIndex) HorizontalDivider()
+                Text(money(row.amountCents), style = MaterialTheme.typography.titleMedium)
             }
+            if (index < rows.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = Palette.Border)
         }
     }
 }
 
-@Composable private fun InfoCard(text: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = Mist), modifier = Modifier.fillMaxWidth()) { Text(text, Modifier.padding(15.dp), color = Navy) }
-}
-
 private fun rewardLabel(product: String) = when (product) { "savor" -> "3% on select categories"; "venture" -> "2 miles per dollar"; else -> "1.5% cash back" }
-private fun cardGradient(index: Int) = Brush.linearGradient(if (index % 3 == 0) listOf(Color(0xFF4F46E5), Color(0xFF7C3AED)) else listOf(Color(0xFF334155), Color(0xFF0F172A)))
 private fun Double.toCleanQuantity(): String = if (this % 1.0 == 0.0) toInt().toString() else toString()
