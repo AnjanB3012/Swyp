@@ -1,0 +1,271 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* TapChoiceTerminalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* TapChoiceTerminalApp.swift */; };
+		A10000000000000000000002 /* MerchantTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* MerchantTerminalView.swift */; };
+		A10000000000000000000003 /* NFCReaderManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* NFCReaderManager.swift */; };
+		A10000000000000000000004 /* ProtocolModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* ProtocolModels.swift */; };
+		A10000000000000000000005 /* SignatureVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SignatureVerifier.swift */; };
+		A10000000000000000000006 /* CoreNFC.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* CoreNFC.framework */; };
+		A10000000000000000000007 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* CryptoKit.framework */; };
+		A10000000000000000000008 /* BackendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* BackendClient.swift */; };
+		A10000000000000000000009 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* GoogleService-Info.plist */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* TapChoiceTerminalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapChoiceTerminalApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* MerchantTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MerchantTerminalView.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* NFCReaderManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NFCReaderManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* ProtocolModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* SignatureVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureVerifier.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000007 /* TapChoiceTerminal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TapChoiceTerminal.entitlements; sourceTree = "<group>"; };
+		A20000000000000000000008 /* CoreNFC.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreNFC.framework; path = System/Library/Frameworks/CoreNFC.framework; sourceTree = SDKROOT; };
+		A20000000000000000000009 /* CryptoKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CryptoKit.framework; path = System/Library/Frameworks/CryptoKit.framework; sourceTree = SDKROOT; };
+		A2000000000000000000000A /* TapChoiceTerminal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TapChoiceTerminal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000000000000000000000B /* BackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendClient.swift; sourceTree = "<group>"; };
+		A2000000000000000000000C /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000006 /* CoreNFC.framework in Frameworks */,
+				A10000000000000000000007 /* CryptoKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* TapChoiceTerminal */,
+				A40000000000000000000004 /* Frameworks */,
+				A40000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* TapChoiceTerminal */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* TapChoiceTerminalApp.swift */,
+				A20000000000000000000002 /* MerchantTerminalView.swift */,
+				A20000000000000000000003 /* NFCReaderManager.swift */,
+				A2000000000000000000000B /* BackendClient.swift */,
+				A40000000000000000000003 /* Protocol */,
+				A20000000000000000000006 /* Info.plist */,
+				A2000000000000000000000C /* GoogleService-Info.plist */,
+				A20000000000000000000007 /* TapChoiceTerminal.entitlements */,
+			);
+			path = TapChoiceTerminal;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* Protocol */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000004 /* ProtocolModels.swift */,
+				A20000000000000000000005 /* SignatureVerifier.swift */,
+			);
+			path = Protocol;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000008 /* CoreNFC.framework */,
+				A20000000000000000000009 /* CryptoKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000A /* TapChoiceTerminal.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* TapChoiceTerminal */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A60000000000000000000002 /* Build configuration list for PBXNativeTarget "TapChoiceTerminal" */;
+			buildPhases = (
+				A30000000000000000000002 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A30000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TapChoiceTerminal;
+			productName = TapChoiceTerminal;
+			productReference = A2000000000000000000000A /* TapChoiceTerminal.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A70000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = A60000000000000000000001 /* Build configuration list for PBXProject "TapChoiceTerminal" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			productRefGroup = A40000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* TapChoiceTerminal */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000009 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A30000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* TapChoiceTerminalApp.swift in Sources */,
+				A10000000000000000000002 /* MerchantTerminalView.swift in Sources */,
+				A10000000000000000000003 /* NFCReaderManager.swift in Sources */,
+				A10000000000000000000004 /* ProtocolModels.swift in Sources */,
+				A10000000000000000000005 /* SignatureVerifier.swift in Sources */,
+				A10000000000000000000008 /* BackendClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A80000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A80000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A80000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TapChoiceTerminal/TapChoiceTerminal.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N5UAS5JKFS;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TapChoiceTerminal/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.swyp.reader;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A80000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TapChoiceTerminal/TapChoiceTerminal.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = N5UAS5JKFS;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TapChoiceTerminal/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.swyp.reader;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A60000000000000000000001 /* Build configuration list for PBXProject "TapChoiceTerminal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000000000000000000001 /* Debug */,
+				A80000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A60000000000000000000002 /* Build configuration list for PBXNativeTarget "TapChoiceTerminal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000000000000000000003 /* Debug */,
+				A80000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A70000000000000000000001 /* Project object */;
+}

@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    match /config/{id} { allow read: if request.auth != null; allow write: if false; }
+    match /deals/{id} { allow read: if request.auth != null; allow write: if false; }
+    match /stores/{id} { allow read: if request.auth != null; allow write: if false; }
+    match /users/{uid} {
+      allow read: if owner(uid);
+      allow write: if false;
+      match /{collection}/{id} {
+        allow read: if owner(uid);
+        allow write: if false;
+      }
+    }
+  }
+}
