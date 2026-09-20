@@ -55,6 +55,7 @@ class SwypViewModel(app: Application) : AndroidViewModel(app) {
     private var sessionJob: Job? = null
     private var initJob: Job? = null
     private var settingsJob: Job? = null
+    private var dealsRefreshed = false
     private val authListener =
         FirebaseAuth.AuthStateListener { a ->
             listeners.forEach { it.remove() }
@@ -64,6 +65,7 @@ class SwypViewModel(app: Application) : AndroidViewModel(app) {
             sessionJob?.cancel()
             initJob?.cancel()
             settingsJob?.cancel()
+            dealsRefreshed = false
             val user = a.currentUser
             mutable.value =
                 UiState(configured = true, signedIn = user != null, email = user?.email.orEmpty())
@@ -420,10 +422,59 @@ class SwypViewModel(app: Application) : AndroidViewModel(app) {
             }
     }
 
+    /**
+     * Asks the backend to run today's deal search if it hasn't already run. The backend caches
+     * results for the whole day; published offers arrive through the [db] "deals" listener, so we
+     * only need to trigger it once per session. Non-fatal on failure.
+     */
+    fun refreshDeals() {
+        if (dealsRefreshed || auth?.currentUser == null) return
+        dealsRefreshed = true
+        viewModelScope.launch {
+            mutable.value = mutable.value.copy(busy = true)
+            try {
+                api("deals/refresh")
+            } catch (e: Exception) {
+                dealsRefreshed = false
+            } finally {
+                mutable.value = mutable.value.copy(busy = false)
+            }
+        }
+    }
+
     fun cancelTap() {
         sessionJob?.cancel()
         ArmedPayment.clear()
         mutable.value = mutable.value.copy(armed = false)
+    }
+
+    /**
+     * Enters tap-to-pay for a card chosen and armed outside the UI (the Snap & Pay widget already
+     * posted the credential and armed [ArmedPayment]). This only mirrors that state into the UI so
+     * the full-screen tap view appears, with no card selection or confirmation step. Resilient to a
+     * cold start: [card] is injected into the (possibly still-loading) wallet so the tap view can
+     * render before Firestore snapshots arrive; once they do, the matching id keeps it selected.
+     */
+    fun applyExternalArm(card: SwypCard, checkout: Checkout) {
+        ArmedPayment.arm(card)
+        val known = mutable.value.cards
+        val cards = if (known.any { it.id == card.id }) known else known + card
+        mutable.value =
+            mutable.value.copy(
+                cards = cards,
+                checkout = checkout,
+                selected = card.id,
+                armed = true,
+                message = "${card.name} is ready to tap for 2 minutes.",
+            )
+        recompute()
+        sessionJob?.cancel()
+        sessionJob =
+            viewModelScope.launch {
+                delay(120000)
+                ArmedPayment.clear()
+                mutable.value = mutable.value.copy(armed = false)
+            }
     }
 
     private suspend fun api(path: String, body: JSONObject = JSONObject()): JSONObject {

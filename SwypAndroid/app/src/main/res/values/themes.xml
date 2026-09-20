@@ -1,8 +1,0 @@
-<resources>
-    <style name="Theme.Swyp" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">@color/swyp_bg</item>
-        <item name="android:navigationBarColor">@color/swyp_bg</item>
-        <item name="android:windowBackground">@color/swyp_bg</item>
-        <item name="android:windowLightStatusBar">true</item>
-    </style>
-</resources>

@@ -28,8 +28,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.tasks.await
 import java.math.BigDecimal
 import java.time.LocalDate
 import kotlinx.coroutines.launch
@@ -41,7 +44,10 @@ class MainActivity : ComponentActivity() {
     private var pendingImage by mutableStateOf<Bitmap?>(null)
     private var currentTab by mutableStateOf("Home")
     private var selectedCardDetail by mutableStateOf<String?>(null)
+    private var pendingArm by mutableStateOf<Pair<SwypCard, Checkout>?>(null)
     private var fineLocationGranted by mutableStateOf(false)
+    private var userLocation by mutableStateOf<Pair<Double, Double>?>(null)
+    private val fusedLocation by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private val photoFile get() = java.io.File(cacheDir, "camera/checkout.jpg")
 
     private fun photoUri(): Uri {
@@ -57,17 +63,29 @@ class MainActivity : ComponentActivity() {
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val location = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         fineLocationGranted = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        refreshDeviceLocation()
         enableLocation()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         fineLocationGranted = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        refreshDeviceLocation()
         receive(intent)
         if (android.os.Build.VERSION.SDK_INT >= 33) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         setContent {
             SwypTheme {
                 val s by vm.state.collectAsState()
+                // The Snap & Pay widget arms a card headlessly, then opens the app; once the
+                // session is signed in, mirror that armed card into the UI so the tap-to-pay
+                // screen appears with no further taps.
+                LaunchedEffect(s.signedIn, pendingArm) {
+                    val arm = pendingArm
+                    if (arm != null && s.signedIn) {
+                        vm.applyExternalArm(arm.first, arm.second)
+                        pendingArm = null
+                    }
+                }
                 Surface(Modifier.fillMaxSize().background(Palette.CanvasBrush), color = Color.Transparent) {
                     when {
                         !s.configured -> SetupScreen()
@@ -121,12 +139,13 @@ class MainActivity : ComponentActivity() {
                                         { currentTab = "Pay" },
                                     )
                                     currentTab == "Nearby" -> Nearby(
-                                        s, vm, fineLocationGranted,
+                                        s, vm, fineLocationGranted, userLocation,
                                         {
                                             location.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                                             if (android.os.Build.VERSION.SDK_INT >= 33) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
                                         },
                                         { StoreAlerts.disable(this@MainActivity); vm.message("Nearby alerts turned off.") },
+                                        ::refreshDeviceLocation,
                                     )
                                     currentTab == "Insights" -> Insights(s, vm) { currentTab = "Home" }
                                 }
@@ -144,6 +163,22 @@ class MainActivity : ComponentActivity() {
     private fun receive(intent: Intent) {
         intent.getStringExtra("tab")?.let { currentTab = if (it == "Offers") "Nearby" else it }
         intent.getStringExtra("cardId")?.let(vm::select)
+        intent.getStringExtra("armCardId")?.let { id ->
+            pendingArm =
+                SwypCard(
+                    id = id,
+                    product = intent.getStringExtra("armProduct").orEmpty(),
+                    name = intent.getStringExtra("armName").orEmpty(),
+                    last4 = intent.getStringExtra("armLast4").orEmpty(),
+                    limitCents = intent.getLongExtra("armLimit", 0),
+                    balanceCents = intent.getLongExtra("armBalance", 0),
+                ) to
+                    Checkout(
+                        merchant = intent.getStringExtra("armMerchant").orEmpty(),
+                        amountCents = intent.getLongExtra("armAmount", 0),
+                        category = intent.getStringExtra("armCategory") ?: "other",
+                    )
+        }
         if (intent.action == Intent.ACTION_SEND) {
             @Suppress("DEPRECATION") val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
             uri?.let(::loadImage)
@@ -170,6 +205,23 @@ class MainActivity : ComponentActivity() {
                     if (android.os.Build.VERSION.SDK_INT >= 30 && fineLocationGranted)
                         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
                 }
+        }
+    }
+
+    /** Reads the device's current position so the Nearby map can center on and pin "you are here". */
+    private fun refreshDeviceLocation() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+        ) return
+        lifecycleScope.launch {
+            runCatching {
+                val fresh = fusedLocation
+                    .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
+                    .await()
+                fresh ?: fusedLocation.lastLocation.await()
+            }.onSuccess { location ->
+                if (location != null) userLocation = location.latitude to location.longitude
+            }
         }
     }
 }
@@ -539,77 +591,116 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun Nearby(s: UiState, vm: SwypViewModel, locationGranted: Boolean, enable: () -> Unit, disable: () -> Unit) {
+@Composable private fun Nearby(
+    s: UiState,
+    vm: SwypViewModel,
+    locationGranted: Boolean,
+    userLocation: Pair<Double, Double>?,
+    enable: () -> Unit,
+    disable: () -> Unit,
+    refreshLocation: () -> Unit,
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    ScreenTitle("Nearby deals", "Offers from stores around you.")
+    // On first open (per session) pull a fresh fix and kick off the daily deal search.
+    LaunchedEffect(Unit) {
+        refreshLocation()
+        vm.refreshDeals()
+    }
+    ScreenTitle("Nearby deals", "Stores around you and today's deals, closest first.")
     if (!locationGranted) {
         SurfaceCard(container = Palette.Tint, border = Palette.Tint, padding = 18.dp, gap = 12.dp) {
-            Text("See offers after you stay at a participating store for two minutes.", style = MaterialTheme.typography.bodyMedium)
+            Text("Turn on location to sort stores by distance and get alerts when you're near a deal.", style = MaterialTheme.typography.bodyMedium)
             SecondaryButton("Allow location", enable)
         }
-    } else TextButton(onClick = disable, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Turn off nearby alerts", color = Palette.TextMuted) }
-    if (s.stores.isNotEmpty()) {
-        NearbyMap(s.stores)
-        SectionHeader("Participating stores")
-        s.stores.forEach { store ->
-            SurfaceCard(gap = 2.dp) {
+    } else {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = refreshLocation, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                Icon(Icons.Nearby, null, tint = Palette.Primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp)); Text("Update my location", color = Palette.Primary, style = MaterialTheme.typography.labelMedium)
+            }
+            TextButton(onClick = disable, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Turn off alerts", color = Palette.TextMuted) }
+        }
+    }
+
+    // Order stores by distance from the user (nearest first) when we have a fix.
+    val ordered = remember(s.stores, userLocation) {
+        userLocation?.let { (lat, lng) ->
+            s.stores.sortedBy { distanceMeters(lat, lng, it.latitude, it.longitude) }
+        } ?: s.stores
+    }
+
+    if (s.busy && s.offers.isEmpty()) InfoCard("Finding today's deals near you…")
+
+    if (ordered.isNotEmpty()) {
+        SectionHeader("Stores near you")
+        ordered.forEach { store ->
+            val meters = userLocation?.let { distanceMeters(it.first, it.second, store.latitude, store.longitude) }
+            val storeOffers = s.offers.filter { merchantMatches(it.merchant, store.merchant.ifBlank { store.name }) }
+            SurfaceCard(gap = 10.dp) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Avatar(store.name)
-                    Column { Text(store.name, style = MaterialTheme.typography.titleMedium); Muted(store.address) }
+                    Column(Modifier.weight(1f)) {
+                        Text(store.name, style = MaterialTheme.typography.titleMedium)
+                        Muted(store.address)
+                    }
+                    if (meters != null) Pill(prettyDistance(meters), Palette.Tint, Palette.Primary)
                 }
+                if (storeOffers.isEmpty()) Muted("No deals here right now.", style = MaterialTheme.typography.bodyMedium)
+                else storeOffers.forEach { offer -> OfferRow(offer, context) }
             }
         }
     }
-    SectionHeader("Offers")
-    if (s.offers.isEmpty()) InfoCard("No verified offers are available right now.")
-    s.offers.forEach { offer ->
-        SurfaceCard(padding = 18.dp, gap = 6.dp) {
-            Text(offer.merchant, style = MaterialTheme.typography.titleMedium)
-            Text(offer.title, style = MaterialTheme.typography.bodyLarge, color = Palette.Primary, fontWeight = FontWeight.Medium)
-            Muted("Use ${offer.product} · through ${offer.expiresOn}")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (offer.requiresActivation) {
-                    if (offer.id in s.activated) Pill("Activated ✓", Palette.SuccessTint, Palette.Success)
-                    else SecondaryButton("Activate", { vm.activate(offer.id) })
-                }
-                TextButton(onClick = { if (offer.sourceUrl.startsWith("https://")) context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(offer.sourceUrl))) }) {
-                    Text("View eligibility ›", color = Palette.TextMuted, style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp))
-                }
+
+    // Deals whose merchant isn't one of the nearby stores.
+    val extra = s.offers.filter { offer -> ordered.none { merchantMatches(offer.merchant, it.merchant.ifBlank { it.name }) } }
+    if (extra.isNotEmpty()) {
+        SectionHeader("More deals near you")
+        extra.forEach { offer ->
+            SurfaceCard(padding = 16.dp, gap = 6.dp) {
+                Text(offer.merchant, style = MaterialTheme.typography.titleMedium)
+                OfferRow(offer, context)
             }
         }
+    }
+
+    if (ordered.isEmpty() && s.offers.isEmpty() && !s.busy)
+        InfoCard("No stores or deals yet. Pull up this tab again to run today's search.")
+}
+
+/** True when a deal's merchant and a store's merchant refer to the same brand. */
+private fun merchantMatches(offerMerchant: String, storeMerchant: String): Boolean {
+    val a = offerMerchant.trim()
+    val b = storeMerchant.trim()
+    if (a.isBlank() || b.isBlank()) return false
+    return a.equals(b, true) || a.contains(b, true) || b.contains(a, true)
+}
+
+/** One deal's title, terms and eligibility link, used inside store and more-deals cards. */
+@Composable private fun OfferRow(offer: Offer, context: android.content.Context) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(offer.title, style = MaterialTheme.typography.bodyLarge, color = Palette.Primary, fontWeight = FontWeight.Medium)
+        Muted("Use ${offer.product} · through ${offer.expiresOn}")
+        if (offer.sourceUrl.startsWith("https://"))
+            TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(offer.sourceUrl))) }) {
+                Text("View eligibility ›", color = Palette.TextMuted, style = MaterialTheme.typography.labelMedium.copy(fontSize = 14.sp))
+            }
     }
 }
 
-@Composable private fun NearbyMap(stores: List<StoreLocation>) {
-    val markers = remember(stores) {
-        stores.joinToString("\n") { store ->
-            val title = store.name.replace("'", "\\'")
-            "L.marker([${store.latitude},${store.longitude}]).addTo(map).bindPopup('$title');"
-        }
-    }
-    val html = remember(markers) {
-        """
-        <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-        <style>html,body,#map{height:100%;margin:0} .leaflet-control-attribution{font-size:9px}</style></head>
-        <body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <script>const map=L.map('map').setView([37.20,-80.43],11);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
-        $markers
-        const group=L.featureGroup(Object.values(map._layers).filter(x=>x instanceof L.Marker)); if(group.getLayers().length) map.fitBounds(group.getBounds().pad(0.25));</script></body></html>
-        """.trimIndent()
-    }
-    AndroidView(
-        factory = { context ->
-            android.webkit.WebView(context).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                setBackgroundColor(android.graphics.Color.WHITE)
-            }
-        },
-        update = { view -> if (view.tag != html) { view.tag = html; view.loadDataWithBaseURL("https://www.openstreetmap.org/", html, "text/html", "UTF-8", null) } },
-        modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(24.dp)),
-    )
+/** Great-circle distance in meters between two lat/lng points. */
+private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371000.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+private fun prettyDistance(meters: Double): String {
+    val miles = meters / 1609.34
+    return if (miles < 0.2) "${meters.toInt()} m" else String.format("%.1f mi", miles)
 }
 
 @Composable private fun Insights(s: UiState, vm: SwypViewModel, back: () -> Unit) {

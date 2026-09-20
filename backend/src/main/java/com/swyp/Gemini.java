@@ -5,9 +5,68 @@ import java.net.http.*;
 import java.time.*;
 import java.util.*;
 
-final class Gemini {
+class Gemini {
   private final HttpClient http =
       HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
+
+  /**
+   * Sends a request and retries on transient Gemini failures (429/5xx, e.g. the HTTP 503 the model
+   * returns when briefly overloaded) with exponential backoff. Returns a 200 response or throws.
+   */
+  private HttpResponse<String> send(HttpRequest request) throws Exception {
+    IllegalStateException last = null;
+    for (int attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) Thread.sleep(Math.min(6000L, 750L * (1L << (attempt - 1)))); // 0.75s,1.5s,3s
+      var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+      int code = response.statusCode();
+      if (code == 200) return response;
+      last = new IllegalStateException("Gemini returned HTTP " + code);
+      if (!(code == 429 || code == 500 || code == 502 || code == 503 || code == 504)) throw last;
+    }
+    throw last;
+  }
+
+  /**
+   * Runs a Google-Search-grounded generation and returns the model's plain-text answer. Used to
+   * discover current, real deals from the live web before they are structured by {@link #extract}.
+   */
+  String groundedSearch(String prompt) throws Exception {
+    String key = System.getenv("GEMINI_API_KEY");
+    if (key == null || key.isBlank())
+      throw new IllegalStateException("Configure GEMINI_API_KEY on the backend");
+    var body =
+        Map.of(
+            "contents",
+            List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
+            "tools",
+            List.of(Map.of("google_search", Map.of())),
+            "generationConfig",
+            Map.of("temperature", 0));
+    var request =
+        HttpRequest.newBuilder(
+                URI.create(
+                    "https://generativelanguage.googleapis.com/v1beta/models/"
+                        + System.getenv().getOrDefault("GEMINI_MODEL", "gemini-2.5-flash")
+                        + ":generateContent"))
+            .timeout(Duration.ofSeconds(60))
+            .header("x-goog-api-key", key)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(Json.write(body)))
+            .build();
+    var response = send(request);
+    var parts =
+        Json.M.readTree(response.body())
+            .path("candidates")
+            .path(0)
+            .path("content")
+            .path("parts");
+    var text = new StringBuilder();
+    for (var part : parts) {
+      var node = part.path("text");
+      if (node.isTextual()) text.append(node.asText()).append('\n');
+    }
+    return text.toString();
+  }
 
   Object extract(String prompt, String image, Map<String, Object> schema) throws Exception {
     String key = System.getenv("GEMINI_API_KEY");
@@ -43,9 +102,7 @@ final class Gemini {
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(Json.write(body)))
             .build();
-    var response = http.send(request, HttpResponse.BodyHandlers.ofString());
-    if (response.statusCode() != 200)
-      throw new IllegalStateException("Gemini returned HTTP " + response.statusCode());
+    var response = send(request);
     var node =
         Json.M.readTree(response.body())
             .path("candidates")

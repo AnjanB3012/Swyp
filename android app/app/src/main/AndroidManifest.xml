@@ -19,7 +19,15 @@
         <activity android:name=".CaptureActivity" android:exported="false" android:excludeFromRecents="true" android:taskAffinity="" android:finishOnTaskLaunch="true" android:theme="@style/Theme.Swyp.Capture"/>
         <service android:name=".CaptureService" android:exported="false" android:foregroundServiceType="mediaProjection"/>
         <service android:name=".CaptureAnalyzeService" android:exported="false" android:foregroundServiceType="dataSync"/>
+        <activity android:name=".SnapPayActivity" android:exported="false" android:excludeFromRecents="true" android:taskAffinity="" android:theme="@style/Theme.Swyp"/>
+        <receiver android:name=".SnapPayWidget" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/snap_pay_widget_info"/>
+        </receiver>
         <service android:name=".SwypTile" android:label="Scan with Swyp" android:icon="@android:drawable/ic_menu_camera" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+        </service>
+        <service android:name=".SnapPayTile" android:label="Snap &amp; Pay" android:icon="@drawable/ic_snap_pay" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
         </service>
         <service android:name=".nfc.SwypHceService" android:exported="true" android:permission="android.permission.BIND_NFC_SERVICE">
@@ -27,6 +35,5 @@
             <meta-data android:name="android.nfc.cardemulation.host_apdu_service" android:resource="@xml/apduservice"/>
         </service>
         <receiver android:name=".StoreReceiver" android:exported="false"/>
-        <receiver android:name=".CaptureActionReceiver" android:exported="false"/>
     </application>
 </manifest>

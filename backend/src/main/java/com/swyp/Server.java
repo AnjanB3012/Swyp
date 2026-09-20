@@ -114,6 +114,7 @@ public final class Server {
                   }
                   case "/v1/payments/process" -> bank.process(uid, Json.str(body, "nonce"));
                   case "/v1/checkout" -> gemini.checkout(Json.str(body, "image"));
+                  case "/v1/deals/refresh" -> deals.dailyRefreshIfNeeded(uid);
                   default -> null;
                 };
             if (result == null) send(exchange, 404, Map.of("error", "Unknown endpoint"));

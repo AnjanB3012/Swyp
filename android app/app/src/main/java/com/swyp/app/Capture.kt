@@ -3,7 +3,6 @@ package com.swyp.app
 import android.app.*
 import android.content.*
 import android.graphics.*
-import android.hardware.display.DisplayManager
 import android.media.ImageReader
 import android.media.projection.*
 import android.os.*
@@ -22,11 +21,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
-private const val ACTION_DISMISS_CAPTURE = "com.swyp.app.DISMISS_CAPTURE"
 private const val ACTION_CAPTURE_NOW = "com.swyp.app.CAPTURE_NOW"
 private const val ACTION_STOP_CAPTURE = "com.swyp.app.STOP_CAPTURE"
 private const val SESSION_NOTIFICATION = 10
-private const val CAPTURE_NOTIFICATION = 11
 private const val ANALYSIS_NOTIFICATION = 12
 private const val RESULT_NOTIFICATION = 13
 
@@ -154,12 +151,12 @@ class CaptureService : Service() {
                     file.parentFile?.mkdirs()
                     file.outputStream().use { result.compress(Bitmap.CompressFormat.JPEG, 88, it) }
                     result.recycle()
-                    showConfirmation()
+                    startAnalysis()
                 } finally { frame.close() }
             }, handler)
             display = projection!!.createVirtualDisplay(
                 "Swyp checkout", bounds.width(), bounds.height(), resources.displayMetrics.densityDpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, reader!!.surface, null, handler,
+                0, reader!!.surface, null, handler,
             )
             isReady = true
             requestCapture(1100)
@@ -171,28 +168,8 @@ class CaptureService : Service() {
         captureAfter = SystemClock.elapsedRealtime() + delayMillis
     }
 
-    private fun showConfirmation() {
-        val send = PendingIntent.getForegroundService(
-            this, 20, Intent(this, CaptureAnalyzeService::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val dismiss = PendingIntent.getBroadcast(
-            this, 21, Intent(this, CaptureActionReceiver::class.java).setAction(ACTION_DISMISS_CAPTURE),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        getSystemService(NotificationManager::class.java).notify(
-            CAPTURE_NOTIFICATION,
-            NotificationCompat.Builder(this, "scan_results")
-                .setSmallIcon(android.R.drawable.ic_menu_camera)
-                .setContentTitle("Send this screen to Swyp?")
-                .setContentText("Send analyzes the visible bill items. Dismiss ignores and deletes it.")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(false)
-                .setDeleteIntent(dismiss)
-                .addAction(android.R.drawable.ic_menu_send, "Send", send)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismiss)
-                .build(),
-        )
+    private fun startAnalysis() {
+        startForegroundService(Intent(this, CaptureAnalyzeService::class.java))
     }
 
     override fun onDestroy() {
@@ -205,21 +182,11 @@ class CaptureService : Service() {
     }
 }
 
-class CaptureActionReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == ACTION_DISMISS_CAPTURE) {
-            captureFile(context).delete()
-            context.getSystemService(NotificationManager::class.java).cancel(CAPTURE_NOTIFICATION)
-        }
-    }
-}
-
 class CaptureAnalyzeService : Service() {
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     override fun onBind(intent: Intent?) = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        getSystemService(NotificationManager::class.java).cancel(CAPTURE_NOTIFICATION)
         startForeground(
             ANALYSIS_NOTIFICATION,
             NotificationCompat.Builder(this, "scan_results")
@@ -314,7 +281,7 @@ class CaptureAnalyzeService : Service() {
     override fun onDestroy() { work.cancel(); super.onDestroy() }
 }
 
-private fun parseCheckout(json: JSONObject): Checkout {
+internal fun parseCheckout(json: JSONObject): Checkout {
     val rows = json.optJSONArray("items")
     val items = buildList {
         if (rows != null) for (index in 0 until rows.length()) {
